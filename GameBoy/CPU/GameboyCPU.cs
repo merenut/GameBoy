@@ -23,7 +23,7 @@ public class GameboyCPU(MemoryController mc)
     public UInt16 BC => (UInt16)(RegisterB << 8 | RegisterC);
     public UInt16 DE => (UInt16)(RegisterD << 8 | RegisterE);
     public UInt16 HL => (UInt16)(RegisterH << 8 | RegisterL);
-    public UInt16 NN => (UInt16)(++RegisterPC << 8 | ++RegisterPC);
+    //public UInt16 NN => (UInt16)(mc.GetByteReference(++RegisterPC) | mc.GetByteReference(++RegisterPC) << 8);
 
     public UInt16 RegisterPC { get; set; } //Points to the next instruction (starts at $100)
     public UInt16 RegisterSP { get; set; }
@@ -38,13 +38,32 @@ public class GameboyCPU(MemoryController mc)
     public void Initialize()
     {
         RegisterPC = 0x100;
+        RegisterSP = 0xFFFE;
     }
 
     public void PerformNext()
     {
         byte current = mc.GetByteReference(RegisterPC);
+
+        Console.WriteLine($"Current PC: {RegisterPC} Current OpCode: {current:x8}");
         Lookup(current);
         RegisterPC+=1;
+        //Thread.Sleep(200);
+    }
+
+    public ushort getNN()
+    {
+        var lowbit = mc.GetByteReference(RegisterPC + 1);
+        var highbit = mc.GetByteReference(RegisterPC + 2);
+        RegisterPC += 2;
+        return (ushort)(highbit << 8 | lowbit);
+    }
+
+    public byte getN()
+    {
+        var n = mc.GetByteReference(RegisterPC + 1);
+        RegisterPC++;
+        return n;
     }
 
     /// <summary>
@@ -55,12 +74,12 @@ public class GameboyCPU(MemoryController mc)
     {
         (current switch
         {
-            0x06 => LD8(RegisterB, ref mc.GetByteReference(++RegisterPC), 8),
-            0x0E => LD8(RegisterC, ref mc.GetByteReference(++RegisterPC), 8),
-            0x16 => LD8(RegisterD, ref mc.GetByteReference(++RegisterPC), 8),
-            0x1E => LD8(RegisterE, ref mc.GetByteReference(++RegisterPC), 8),
-            0x26 => LD8(RegisterH, ref mc.GetByteReference(++RegisterPC), 8),
-            0x2E => LD8(RegisterL, ref mc.GetByteReference(++RegisterPC), 8),
+            0x06 => LD8(mc.GetByteReference(++RegisterPC), ref RegisterB, 8),
+            0x0E => LD8(mc.GetByteReference(++RegisterPC), ref RegisterC, 8),
+            0x16 => LD8(mc.GetByteReference(++RegisterPC), ref RegisterD, 8),
+            0x1E => LD8(mc.GetByteReference(++RegisterPC), ref RegisterE, 8),
+            0x26 => LD8(mc.GetByteReference(++RegisterPC), ref RegisterH, 8),
+            0x2E => LD8(mc.GetByteReference(++RegisterPC), ref RegisterL, 8),
             0x7F => LD8(RegisterA, ref RegisterA, 4),
             0x78 => LD8(RegisterB, ref RegisterA, 4),
             0x79 => LD8(RegisterC, ref RegisterA, 4),
@@ -117,30 +136,38 @@ public class GameboyCPU(MemoryController mc)
             0x73 => LD8(RegisterE, ref mc.GetByteReference(HL), 8),
             0x74 => LD8(RegisterH, ref mc.GetByteReference(HL), 8),
             0x75 => LD8(RegisterL, ref mc.GetByteReference(HL), 8),
-            0x36 => LD8(mc.GetByteReference(++RegisterPC), ref mc.GetByteReference(HL), 8), 
+            0x36 => LD8(mc.GetByteReference(++RegisterPC), ref mc.GetByteReference(HL), 8),
             0x0A => LD8(mc.GetByteReference(BC), ref RegisterA, 8),
             0x1A => LD8(mc.GetByteReference(DE), ref RegisterA, 8),
-            0xFA => LD8(mc.GetByteReference(NN), ref RegisterA, 16),
+            0xFA => LD8(mc.GetByteReference(getN()), ref RegisterA, 16),
             0x3E => LD8(mc.GetByteReference(++RegisterPC), ref RegisterA, 8),
             0x47 => LD8(RegisterA, ref RegisterB, 4),
             0x4F => LD8(RegisterA, ref RegisterC, 4),
             0x57 => LD8(RegisterA, ref RegisterD, 4),
             0x5F => LD8(RegisterA, ref RegisterE, 4),
             0x67 => LD8(RegisterA, ref RegisterH, 4),
-            0x6F=> LD8(RegisterA, ref RegisterL, 4),
+            0x6F => LD8(RegisterA, ref RegisterL, 4),
             0x02 => LD8(RegisterA, ref mc.GetByteReference(BC), 8),
             0x12 => LD8(RegisterA, ref mc.GetByteReference(DE), 8),
             0x77 => LD8(RegisterA, ref mc.GetByteReference(HL), 8),
-            0xEA => LD8(RegisterA, ref mc.GetByteReference(NN), 16),
+            0xEA => LD8(RegisterA, ref mc.GetByteReference(getNN()), 16),
             0xF2 => LD8(mc.GetByteReference(0xFF00 + RegisterC), ref RegisterA, 8),
             0xE2 => LD8(RegisterA, ref mc.GetByteReference(0xFF00 + RegisterC), 8),
-            0x3A => () => { },//TODO fix
-            0x32 => () => { },//TODO fix
-            0x2A => () => { },//TODO fix
-            0x22 => () => { },//TODO fix
+            0x3A => LDAHLD(),
+            0x32 => LDHLAD(),
+            0x2A => LDAHLI(),
+            0x22 => LDHLAI(),
             0xE0 => LD8(RegisterA, ref mc.GetByteReference(0xFF00 + mc.GetByteReference(++RegisterPC)), 12),
             0xF0 => LD8(mc.GetByteReference(0xFF00 + mc.GetByteReference(++RegisterPC)), ref RegisterA, 12),
-            //TODO ADD 16 bit loads
+            //16 bit loads
+            0x01 => LD16(getNN(), ref RegisterB, ref RegisterC),
+            0x11 => LD16(getNN(), ref RegisterD, ref RegisterE),
+            0x21 => LD16(getNN(), ref RegisterH, ref RegisterL),
+            0x31 => LD16SP(getNN()),
+            0xF9 => LD16SP(HL),
+            0xF8 => LDHL_SP_N(),
+            0x08 => LD16_To_Memory(getNN(), RegisterSP),
+            //Push & Pop
             0xF5 => Push(RegisterA, RegisterF),
             0xC5 => Push(RegisterB, RegisterC),
             0xD5 => Push(RegisterD, RegisterE),
@@ -257,16 +284,24 @@ public class GameboyCPU(MemoryController mc)
             {
                 RegisterSP--;
             },
-            0xCB => ProcessCB(),
-            0x27 => () => {}, //Find out how DAA works
+            //0xCB => ProcessCB(),
+            0x27 => () => { }, //Find out how DAA works
             0x2F => CPL8(ref RegisterA),
             0x3F => CCF(),
             0x37 => SCF(),
-            0x00 => () => {Cycle(4);},
+            0x00 => () => { Console.WriteLine("No Op"); },
             //Todo add CB
-            //Todo add halt and stop
-            //Todo add DI and EI
-            //Todo add Rotates
+            //Halt & Stop
+            //Todo add stop
+            0x76 => () => { }, //Cant do until IO Interupts are programmed
+            //Interupts
+            0xF3 => DI(),
+            0xFB => EI(),
+            //Rotates
+            0x07 => RLCA(),
+            0x17 => RLCA(),
+            0x0F => RRCA(),
+            0x1F => RRCA(),
             //Todo figure out bit opcodes
             0xC3 => JP(),
             0xC2 => JPCC(!ZeroFlag),
@@ -298,13 +333,14 @@ public class GameboyCPU(MemoryController mc)
             0xD0 => RetCC(!CarryFlag),
             0xD8 => RetCC(CarryFlag),
             0xD9 => RetI(),
-            
+
             _ => () => { Console.WriteLine($"Current OP Code: {current:x8} not recognized."); }
-        })();
+        }) ();
     }
 
     private Action ProcessCB()
     {
+        //Console.WriteLine("Performing CB");
         return () => { };
     }
 
@@ -312,6 +348,7 @@ public class GameboyCPU(MemoryController mc)
 
     public Action Restart(UInt16 n)
     {
+        Console.WriteLine($"Performing Restart at {n:x8}");
         RegisterPC = n;
         return () => { };
     }
@@ -343,6 +380,7 @@ public class GameboyCPU(MemoryController mc)
     /// </summary>
     public Action LD8(byte v1, ref byte v2, short cycle)
     {
+         Console.WriteLine($"Performing Load (8), Loading value: {v1:x8}");
         v2 = v1;
         return () => { Cycle(cycle); };
     }
@@ -354,13 +392,96 @@ public class GameboyCPU(MemoryController mc)
         hl--;
         h = (byte)(hl >> 8);
         l = (byte)(hl & 0xFF);
+
+        Console.WriteLine($"Performing Load (8), Loading value: {hl:x8} int {v2:x8}");
         return () => { Cycle(cycle); };
+    }
+
+    public Action LDHLAI()
+    {
+        Console.WriteLine($"Performing LDHLAI");
+        var n1 = mc.GetByteReference(HL);
+        n1 = RegisterA;
+        Inc16(ref RegisterH, ref RegisterL);
+        return () => { };
+    }
+
+    public Action LDAHLI()
+    {
+        Console.WriteLine($"Performing LDAHLI");
+        var n1 = mc.GetByteReference(HL);
+        RegisterA = n1;
+        Inc16(ref RegisterH, ref RegisterL);
+        return () => { };
+    }
+    public Action LDHLAD()
+    {
+        Console.WriteLine($"Performing LDHLAD");
+        var n1 = mc.GetByteReference(HL);
+        n1 = RegisterA;
+        Dec16(ref RegisterH, ref RegisterL);
+        return () => { };
+    }
+
+    public Action LDAHLD()
+    {
+        Console.WriteLine($"Performing LDAHLD");
+        var n1 = mc.GetByteReference(HL);
+        RegisterA = n1;
+        Dec16(ref RegisterH, ref RegisterL);
+        return () => { };
     }
 
     public Action LD16(byte v1, byte v2, ref byte n1, ref byte n2)
     {
+        Console.WriteLine($"Performing Load (16), Loading value: {v1:x8} and {v2:x8}");
         n1 = v1;
         n2 = v2;
+        return () => { };
+    }
+
+    public Action LD16(ushort v1, ref byte n1, ref byte n2)
+    {
+        Console.WriteLine($"Performing Load (16), Loading value: {v1:x16}");
+        var high = v1 & 0x00FF;
+        var low = v1 >> 8;
+        n1 = (byte)low;
+        n2 = (byte)high;
+        return () => { };
+    }
+
+    public Action LD16SP(ushort v1)
+    {
+        Console.WriteLine($"Performing Load (16), Loading value: {v1:x8} into SP");
+        RegisterSP = v1;
+        return () => { };
+    }
+
+    public Action LDHL_SP_N()
+    {
+        Console.WriteLine($"Performing LDHL_SP_N");
+        var n = getN();
+        var result = RegisterSP + n;
+        RegisterH = (byte)(result >> 8);
+        RegisterL = (byte)(result & 0xFF);
+
+        //Set Flags
+        ZeroFlag = false;
+        SubFlag = false;
+        HalfCarryFlag = ((RegisterSP & 0xF) + (n & 0xF)) > 0xF;
+        CarryFlag = ((RegisterSP & 0xFF) + (n & 0xFF)) > 0xFF;
+        return () => { };
+    }
+
+    public Action LD16_To_Memory(ushort address, ushort value)
+    {
+        Console.WriteLine($"Performing Load (16), Loading value: {value:x8} to address {address:x8}");
+        byte n1 = mc.GetByteReference(address);
+        byte n2 = mc.GetByteReference(address + 1);
+
+        n1 = (byte)(value & 0xFF);
+        n2 = (byte)(value >> 8);
+
         return () => { };
     }
 
@@ -370,15 +491,22 @@ public class GameboyCPU(MemoryController mc)
 
     public Action Pop(ref byte v, ref byte v2)
     {
-        v2 = mc.GetByteReference(++RegisterSP);
-        v = mc.GetByteReference(++RegisterSP);
+        v2 = (byte)(mc.GetByteReference(RegisterSP));
+        RegisterSP++;
+        v = mc.GetByteReference(RegisterSP);
+        Console.WriteLine($"Performing Pop, Loading value from: {v:x8} and {v2:x8}");
+        RegisterSP++;
         return () => { };
     }
 
     public Action Push(byte v, byte v2)
     {
-        mc.GetByteReference(RegisterSP--) = v;
-        mc.GetByteReference(RegisterSP--) = v2;
+        Console.WriteLine($"Performing Push, Loading value from: {v:x8} and {v2:x8} into address {RegisterSP:x8}");
+        //Dec SP
+        RegisterSP--;
+        mc.GetByteReference(RegisterSP) = v;
+        RegisterSP--;
+        mc.GetByteReference(RegisterSP) = v2;
         return () => { };
     }
     
@@ -391,53 +519,122 @@ public class GameboyCPU(MemoryController mc)
     /// </summary>
     public Action Add8(byte nn, ref byte n)
     {
+        Console.WriteLine($"Performing Add8");
+        var original = n;
+        int result = (int)n + (int)nn;
         n += nn;
+
+        //Set Flags
+        ZeroFlag = n == 0;
+        SubFlag = false;
+        HalfCarryFlag = (((original & 0xF) + (nn & 0xF)) & 0x10) != 0;
+        CarryFlag = result > 0xFF;
+
         return () => { };
     }
 
     public Action Sub8(byte nn, ref byte n)
     {
+        Console.WriteLine($"Performing Sub8");
+        var original = n;
+        var result = n - nn;
         n -= nn;
+
+        ZeroFlag = n == 0;
+        SubFlag = true;
+        HalfCarryFlag = (original & 0xF) < (nn & 0xF);
+        CarryFlag = result > 0;
+
         return () => { };
     }
 
     public Action Or8(byte nn, ref byte n)
     {
+        Console.WriteLine($"Performing Or8");
         n |= nn;
+
+        //Set Flags
+        ZeroFlag = n == 0;
+        SubFlag = false;
+        HalfCarryFlag = false;
+        CarryFlag = false;
+
         return () => { };
     }
 
     public Action And8(byte nn, ref byte n)
     {
+        Console.WriteLine($"Performing And8");
         n &= nn;
+
+        //Set Flags
+        ZeroFlag = n == 0;
+        SubFlag = false;
+        HalfCarryFlag = true;
+        CarryFlag = false;
+
         return () => { };
     }
 
     public Action Xor8(byte nn, ref byte n)
     {
+        Console.WriteLine($"Performing Xor8");
         n ^= nn;
+
+        //Set Flags
+        ZeroFlag = n == 0;
+        SubFlag = false;
+        HalfCarryFlag = false;
+        CarryFlag = false;
+
         return () => { };
     }
 
     public Action CMP8(byte nn, byte n)
     {
+        Console.WriteLine($"Performing Cmp8");
+
+        //Set Flags
+        ZeroFlag = nn - n == 0;
+        SubFlag = true;
+        HalfCarryFlag = (nn & 0xF) < (n & 0xF);
+        CarryFlag = nn < n;
+
         return () => { };
     }
 
     public Action Inc8(ref byte n)
     {
+        Console.WriteLine($"Performing Inc8");
+        var original = n;
         Add8(1, ref n);
+
+        ZeroFlag = n == 0;
+        SubFlag = false;
+        HalfCarryFlag = (((original & 0xF) + (1 & 0xF)) & 0x10) != 0;
+        CarryFlag = false;
+
         return () => { };
     }
 
     public Action Dec8(ref byte n)
     {
+        Console.WriteLine($"Performing Dec8");
+        var original = n;
         Sub8(1, ref n);
+
+        ZeroFlag = n == 0;
+        SubFlag = true;
+        HalfCarryFlag = (original & 0xF) < (1 & 0xF);
+        CarryFlag = false;
+
+
         return () => { };
     }
 
     public Action Add16(UInt16 nn, ref byte n1, ref byte n2)
     {
+        Console.WriteLine($"Performing Add16");
         var ncom = (n1 << 8) | n2;
 
         var result = nn + ncom;
@@ -449,12 +646,15 @@ public class GameboyCPU(MemoryController mc)
 
     public Action AddSP(byte n)
     {
+        Console.WriteLine($"Performing AddSP");
         RegisterSP += n;
         return () => { };
     }
 
     public Action Inc16(ref byte n1, ref byte n2)
     {
+        Console.WriteLine($"Performing Inc16");
+        //No Flags Affected
         var ncom = (n1 << 8) | n2; //registers combined into int
 
         ncom++;
@@ -466,6 +666,8 @@ public class GameboyCPU(MemoryController mc)
 
     public Action Dec16(ref byte n1, ref byte n2)
     {
+        Console.WriteLine($"Performing Dec16");
+        //No flags affected
         var ncom = (n1 << 8) | n2; //registers combined into int
 
         ncom--;
@@ -481,21 +683,35 @@ public class GameboyCPU(MemoryController mc)
 
     public Action Swap8(ref byte n)
     {
+        Console.WriteLine($"Performing Swap 8");
         var upper = n >> 4;
         var lower = n & 0x0F;
 
         n = (byte)((lower << 4) | upper);
+
+        ZeroFlag = n == 0;
+        SubFlag = false;
+        HalfCarryFlag = false;
+        CarryFlag = false;
+
         return () => { };
     }
 
     public Action CPL8(ref byte n)
     {
+        Console.WriteLine($"Performing Cpl8");
         n = (byte)~n;
+
+        //Set Flags
+        SubFlag = true;
+        HalfCarryFlag = true;
+
         return () => { };
     }
 
     public Action CCF()
     {
+        Console.WriteLine($"Performing CCF");
         SubFlag = false;
         HalfCarryFlag = false;
         CarryFlag = !CarryFlag;
@@ -504,6 +720,7 @@ public class GameboyCPU(MemoryController mc)
 
     public Action SCF()
     {
+        Console.WriteLine($"Performing SCF");
         SubFlag = false;
         HalfCarryFlag = false;
         CarryFlag = true;
@@ -512,12 +729,14 @@ public class GameboyCPU(MemoryController mc)
 
     public Action DI()
     {
+        Console.WriteLine($"Performing DI");
         Interupts = false;
         return () => { };
     }
 
     public Action EI()
     {
+        Console.WriteLine($"Performing EI");
         Interupts = true;
         return () => { };
     }
@@ -525,6 +744,62 @@ public class GameboyCPU(MemoryController mc)
     #endregion
 
     #region Rotates
+
+    public Action RLCA()
+    {
+        Console.WriteLine($"Performing RLCA");
+        var bit7 = (RegisterA & 0b10000000) >> 7;
+        RegisterA = (byte)(RegisterA << 1);
+
+        ZeroFlag = RegisterA == 0;
+        SubFlag = false;
+        HalfCarryFlag = false;
+        CarryFlag = bit7 == 1;
+
+        return () => { };
+    }
+
+    public Action RRCA()
+    {
+        Console.WriteLine($"Performing RRCA");
+        var bit0 = (RegisterA & 0b00000001);
+        RegisterA = (byte)(RegisterA >> 1);
+
+        ZeroFlag = RegisterA == 0;
+        SubFlag = false;
+        HalfCarryFlag = false;
+        CarryFlag = bit0 == 1;
+
+        return () => { };
+    }
+
+    public Action RLC(ref byte n)
+    {
+        Console.WriteLine($"Performing RLC");
+        var bit7 = (n & 0b10000000) >> 7;
+        n = (byte)(n << 1);
+
+        ZeroFlag = n == 0;
+        SubFlag = false;
+        HalfCarryFlag = false;
+        CarryFlag = bit7 == 1;
+
+        return () => { };
+    }
+
+    public Action RRC(ref byte n)
+    {
+        Console.WriteLine($"Performing RRC");
+        var bit0 = (n & 0b00000001);
+        n = (byte)(n >> 1);
+
+        ZeroFlag = n == 0;
+        SubFlag = false;
+        HalfCarryFlag = false;
+        CarryFlag = bit0 == 1;
+
+        return () => { };
+    }
 
     #endregion
 
@@ -536,12 +811,16 @@ public class GameboyCPU(MemoryController mc)
 
     public Action JP() //uses 2 byte immediate value
     {
-        RegisterPC = (UInt16)(NN - 1);
+        var nn = getNN();
+        Console.WriteLine($"Performing JP PC: {RegisterPC} NN: {nn}");
+        RegisterPC = nn;
+        RegisterPC--; ;
         return () => { };
     }
 
     public Action JPCC(bool flag) //Jump if conditions are true
     {
+        Console.WriteLine($"Performing Jump = {flag}");
         if (flag)
             JP();
         else RegisterPC += 2;
@@ -550,20 +829,26 @@ public class GameboyCPU(MemoryController mc)
 
     public Action JP_HL()
     {
+        Console.WriteLine($"Peforming jump to {((RegisterH << 8) | RegisterL)}");
         RegisterPC = (UInt16)((RegisterH << 8) | RegisterL);
+        RegisterPC--;
         return () => { };
     }
 
     public Action JR()
     {
-        RegisterPC += (UInt16)(mc.GetByteReference(RegisterPC + 1) - 1);
+        //Console.WriteLine($"Performing JR"); 
+        var n = (sbyte)getN();
+        Console.WriteLine($"Performing JR PC: {RegisterPC} N: {n}");
+        RegisterPC += (UInt16)(n);
         return () => { };
     }
     public Action JRCC(bool flag)
     {
+        Console.WriteLine($"Performing JRCC = {flag}");
         if (flag)
             JR();
-        else RegisterPC += 2;
+        else RegisterPC += 1;
         return () => { };
     }
 
@@ -573,7 +858,12 @@ public class GameboyCPU(MemoryController mc)
 
     public Action Call16()
     {
-        //Push address of next instruction (PC + 12)
+        Console.WriteLine($"Performing Call16");
+        Console.WriteLine($"Next address is {RegisterPC + 3}");
+        //Push address of next instruction (PC + 3)
+        var low = (byte)((RegisterPC + 3) & 0xFF);
+        var high = (byte)(((RegisterPC + 3) >> 8) & 0xFF);
+        Push(high, low);
 
         //Jump
         JP();
@@ -582,6 +872,7 @@ public class GameboyCPU(MemoryController mc)
 
     public Action CallCC16(bool flag)
     {
+        Console.WriteLine($"Performing CallCC16");
         if (flag)
             Call16();
         return () => { };
@@ -593,17 +884,21 @@ public class GameboyCPU(MemoryController mc)
 
     public Action Ret()
     {
-        byte n1 = new byte();
-        byte n2 = new byte();
-        Pop(ref n1, ref n2);
+       Console.WriteLine($"Performing Ret");
+        
+        byte low = new byte();
+        byte high = new byte();
+        Pop(ref high, ref low);
 
-        RegisterPC = (UInt16)(n1 << 8 | n2);
+        RegisterPC = (UInt16)(high << 8 | low);
+        Console.WriteLine($"Returning to: {RegisterPC + 3}");
         //Pop 2 bytes from stack then JP
         return () => { };
     }
 
     public Action RetCC(bool flag)
     {
+        Console.WriteLine($"Performing RetCC");
         if (flag)
             Ret();
         return () => { };
@@ -611,9 +906,9 @@ public class GameboyCPU(MemoryController mc)
 
     public Action RetI()
     {
+        Console.WriteLine($"Performing RETI");
         Ret();
         EI();
-        //TODO enable interupts
         return () => { };
     }
 

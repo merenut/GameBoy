@@ -1,0 +1,16 @@
+﻿################################################################################
+# This .gitignore file was automatically created by Microsoft(R) Visual Studio.
+################################################################################
+
+/.vs/GameBoy/CopilotIndices/17.13.441.19478/CodeChunks.db
+/.vs/GameBoy/CopilotIndices/17.13.441.19478/CodeChunks.db-wal
+/.vs/GameBoy/CopilotIndices/17.13.441.19478/CodeChunks.db-shm
+/.vs/GameBoy/CopilotIndices/17.13.441.19478/SemanticSymbols.db
+/.vs/GameBoy/CopilotIndices/17.13.441.19478/SemanticSymbols.db-shm
+/.vs/GameBoy/CopilotIndices/17.13.441.19478
+/.vs/GameBoy/FileContentIndex
+/GameBoy/bin/Debug/net8.0/GameBoy.deps.json
+/GameBoy/bin/Debug/net8.0/GameBoy.dll
+/GameBoy/bin/Debug/net8.0/GameBoy.exe
+/GameBoy/bin/Debug/net8.0/GameBoy.pdb
+/GameBoy/bin/Debug/net8.0/GameBoy.runtimeconfig.json

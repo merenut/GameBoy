@@ -16,6 +16,8 @@ public class MemoryController
     public readonly Range OAMSpan = new Range(0xFE00, 0xFE9F);
     public readonly Range IOSoan  = new Range(0xFF00, 0xFF4B);
     public readonly Range RamBank2Span = new Range(0xFF80, 0xFFFE);
+    public readonly Range Unusable1 = new Range(0xFEA0, 0xFEFF);
+    public readonly Range Unusable2 = new Range(0xFF4C, 0xFF7F);
 
     #endregion
     
@@ -29,11 +31,12 @@ public class MemoryController
     public byte[] IoPorts; //0xFF00
     public byte[] RamBank2;
     public byte Ier; //Interupt Enable Register - 0xFFFF (one byte only)
-    
+    public byte unusable; // this byte is the magical byte of no op its for when roms for whatever reason try to access unusable memory
+
     #endregion
 
     #region ROM Info
-    
+
     public byte[] Rom;
     
     public bool CartridgeRam { get; set; }
@@ -52,15 +55,16 @@ public class MemoryController
 
     public MemoryController()
     {
-        RomBank = new byte[RomBankSpan.End.Value - RomBankSpan.Start.Value];
-        SwitchableRomBank = new byte[SRamBankSpan.End.Value - SRomBankSpan.Start.Value];
-        VRam = new byte[VRamSpan.End.Value - VRamSpan.Start.Value];
-        SwitchableRam = new byte[SRamBankSpan.End.Value - SRamBankSpan.Start.Value];
-        RamBank = new byte[RamBankSpan.End.Value - RamBankSpan.Start.Value];
-        SpriteAttrMem = new byte[OAMSpan.End.Value - OAMSpan.Start.Value];
-        IoPorts = new byte[IOSoan.End.Value - IOSoan.Start.Value];
-        RamBank2 = new byte[RamBank2Span.End.Value - RamBank2Span.Start.Value];
+        RomBank = new byte[(RomBankSpan.End.Value - RomBankSpan.Start.Value) + 1];
+        SwitchableRomBank = new byte[(SRamBankSpan.End.Value - SRomBankSpan.Start.Value) + 1];
+        VRam = new byte[(VRamSpan.End.Value - VRamSpan.Start.Value) + 1];
+        SwitchableRam = new byte[(SRamBankSpan.End.Value - SRamBankSpan.Start.Value) + 1];
+        RamBank = new byte[(RamBankSpan.End.Value - RamBankSpan.Start.Value) + 1];
+        SpriteAttrMem = new byte[(OAMSpan.End.Value - OAMSpan.Start.Value) + 1];
+        IoPorts = new byte[(IOSoan.End.Value - IOSoan.Start.Value) + 1];
+        RamBank2 = new byte[(RamBank2Span.End.Value - RamBank2Span.Start.Value) + 1];
         Ier = new byte();
+        unusable = new byte();
     }
 
     public struct CartridgeInfo
@@ -108,9 +112,13 @@ public class MemoryController
         CartridgeType = SetMBC(Rom[0x147]);
         ROMSize = Rom[0x148];
         RAMSize = Rom[0x149];
+
+        //Initialize ROM and RAM switchable banks
         
         //copy ROM Bank
         Array.Copy(Rom, 0x0000, RomBank, 0x0000, 0x3FFF-1);
+        //Load SROMBank1
+        Array.Copy(Rom, 0x4000, SwitchableRomBank, 0x0000, SRomBankSpan.End.Value - SRomBankSpan.Start.Value);
         
     }
 
@@ -157,10 +165,14 @@ public class MemoryController
 
     public ref byte GetByteReference(int address)
     {
-        if (address > 0xFFFF)
+        
+          if (address > 0xFFFF)
             throw new Exception("Address out of bounds");
+        if ((address >= Unusable1.Start.Value && address <= Unusable1.End.Value) ||
+            (address >= Unusable2.Start.Value && address <= Unusable2.End.Value))
+            return ref unusable;
 
-        if (address >= SRomBankSpan.Start.Value && address <= SRomBankSpan.End.Value)
+            if (address >= SRomBankSpan.Start.Value && address <= SRomBankSpan.End.Value)
         {
             return ref SwitchableRomBank[address - SRomBankSpan.Start.Value];
         }
@@ -186,7 +198,13 @@ public class MemoryController
         }
         if (address >= IOSoan.Start.Value && address <= IOSoan.End.Value)
         {
+            if (address == 0xFF02)
+                Console.WriteLine(System.Text.Encoding.ASCII.GetString(new byte[] { IoPorts[address - IOSoan.Start.Value] }));
             return ref IoPorts[address - IOSoan.Start.Value];
+        }
+        if (address >= RamBank2Span.Start.Value && address <= RamBank2Span.End.Value)
+        {
+            return ref RamBank2[address - RamBank2Span.Start.Value];
         }
 
         if (address == 0xFFFF)

@@ -9,11 +9,12 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <Folder Include="TestRoms\"/>
+        <PackageReference Include="Core.System.Windows.Forms" Version="1.0.0-alpha5" />
     </ItemGroup>
 
     <ItemGroup>
-        <PackageReference Include="Core.System.Windows.Forms" Version="1.0.0-alpha5"/>
+      <Folder Include="CPU\Interface\" />
+      <Folder Include="CPU\Models\" />
     </ItemGroup>
 
 </Project>

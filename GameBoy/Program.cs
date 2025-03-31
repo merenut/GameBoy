@@ -5,7 +5,7 @@ using SharpBoy.Graphics;
 using SharpBoy.Memory;
 
 var testpath = Directory.GetParent(Directory.GetCurrentDirectory()).Parent.Parent.FullName;
-testpath += "\\TestRoms\\PG.gb";
+testpath += "\\TestRoms\\LDTest.gb";
 
 Console.WriteLine(new string('-', 80));
 Console.WriteLine("Starting up....");
@@ -20,7 +20,7 @@ var cpu = new GameboyCPU(mc);
 cpu.Initialize();
 
 //Init GUI
-var gameWindow = new Window(mc.Title, mc);
+//var gameWindow = new Window(mc.Title, mc);
 
 while (true)
 {

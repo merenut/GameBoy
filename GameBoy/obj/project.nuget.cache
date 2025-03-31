@@ -1,8 +1,8 @@
 {
   "version": 2,
-  "dgSpecHash": "jRpnKLqIvNw=",
+  "dgSpecHash": "orCfJdSHo9Y=",
   "success": true,
-  "projectFilePath": "C:\\Users\\finge\\RiderProjects\\SharpBoy\\GameBoy\\GameBoy.csproj",
+  "projectFilePath": "C:\\Users\\finge\\source\\repos\\merenut\\GameBoy\\GameBoy\\GameBoy.csproj",
   "expectedPackageFiles": [
     "C:\\Users\\finge\\.nuget\\packages\\accessibility\\4.6.0-preview3-27504-2\\accessibility.4.6.0-preview3-27504-2.nupkg.sha512",
     "C:\\Users\\finge\\.nuget\\packages\\core.mono.webbrowser\\1.0.0-alpha5\\core.mono.webbrowser.1.0.0-alpha5.nupkg.sha512",

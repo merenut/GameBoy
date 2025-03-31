@@ -20,4 +20,29 @@ public class LDTest
         //Assert
         Assert.Equal(0x00, cpu.RegisterB);
     }
+
+    [Fact]
+    public void TestPUSHPOP()
+    {
+        MemoryController memC = new();
+        GameboyCPU cpu = new(memC);
+        cpu.Initialize();
+
+        byte b1 = 0x12;
+        byte b2 = 0x34;
+        byte r1 = 0x00;
+        byte r2 = 0x00;
+
+        cpu.Push(b1, b2);
+        cpu.Pop(ref r1, ref r2);
+
+        Assert.Equal(b1, r1);
+        Assert.Equal(b2, r2);
+
+        cpu.RegisterPC = 0x100;
+        cpu.Call16();
+
+        cpu.Ret();
+        Assert.Equal(cpu.RegisterPC, 0x103);
+    }
 }
